@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tablero de Asistencia Escolar</title>
+<title>Asistencia Despega</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
   :root{
@@ -137,7 +137,7 @@
     <span class="ultima" id="ultima">Sin datos cargados</span>
     <select class="auto" id="autoRefresco" title="Actualización automática">
       <option value="0">Auto: apagado</option>
-      <option value="60">Auto: cada 1 min</option>
+      <option value="60" selected>Auto: cada 1 min</option>
       <option value="300">Auto: cada 5 min</option>
       <option value="600">Auto: cada 10 min</option>
     </select>
@@ -507,16 +507,19 @@ document.querySelectorAll(".chip").forEach(ch=>{
   });
 });
 
-document.getElementById("autoRefresco").addEventListener("change", ev=>{
+document.getElementById("autoRefresco").addEventListener("change", aplicarAutoRefresco);
+
+function aplicarAutoRefresco(){
   if(temporizador){ clearInterval(temporizador); temporizador = null; }
-  const seg = parseInt(ev.target.value, 10);
+  const seg = parseInt(document.getElementById("autoRefresco").value, 10);
   if(seg > 0){
     temporizador = setInterval(cargarDatos, seg * 1000);
   }
-});
+}
 
 /* ================= INICIO ================= */
 cargarDatos();
+aplicarAutoRefresco(); // arranca con el valor por defecto (cada 1 minuto)
 </script>
 </body>
 </html>
