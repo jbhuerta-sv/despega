@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Centros Escolares · El Salvador</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #f7f8fa;
+    --border: #e3e6eb;
+    --border-strong: #cdd2d9;
+    --text: #1a1f2b;
+    --muted: #6b7380;
+    --accent: #c8472b;
+    --accent-2: #1f6feb;
+    --highlight: #fef6e8;
+    --shadow: 0 6px 24px rgba(20,30,50,.08);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: Arial, "Helvetica Neue", Helvetica, "Segoe UI", Calibri, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+  }
+
+  .app {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    height: 100vh;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .brand {
+    padding: 20px 22px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand h1 {
+    margin: 0;
+    font-weight: 700;
+    font-size: 20px;
+    line-height: 1.2;
+    color: var(--text);
+  }
+  .brand p {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .stats {
+    padding: 18px 22px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .stat .label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .stat .value {
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .stat.schools .value { color: var(--accent); }
+  .stat.students .value { color: var(--accent-2); }
+  .stat .sub {
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .search-box {
+    padding: 16px 22px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .search-box label {
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .search-input {
+    width: 100%;
+    background: #fff;
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .search-input:focus {
+    border-color: var(--accent-2);
+    box-shadow: 0 0 0 3px rgba(31,111,235,.12);
+  }
+  .search-input::placeholder { color: #98a0ad; }
+
+  .result-count {
+    padding: 10px 22px;
+    font-size: 12px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  .result-count span { color: var(--text); font-weight: 700; }
+
+  .list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 0;
+  }
+  .list::-webkit-scrollbar { width: 8px; }
+  .list::-webkit-scrollbar-track { background: transparent; }
+  .list::-webkit-scrollbar-thumb { background: #cfd4dc; border-radius: 4px; }
+  .list::-webkit-scrollbar-thumb:hover { background: #b4bac4; }
+
+  .item {
+    padding: 11px 22px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background .12s;
+  }
+  .item:hover { background: var(--panel); }
+  .item.active {
+    background: var(--highlight);
+    border-left: 3px solid var(--accent);
+    padding-left: 19px;
+  }
+  .item .code {
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .item .name {
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.35;
+    margin-bottom: 4px;
+    color: var(--text);
+  }
+  .item .meta {
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .item .badge {
+    background: #eaf2fe;
+    color: var(--accent-2);
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .item.no-results {
+    color: var(--muted);
+    text-align: center;
+    padding: 30px 22px;
+    font-size: 13px;
+    cursor: default;
+  }
+  .item.no-results:hover { background: transparent; }
+
+  /* Map */
+  .map-area {
+    position: relative;
+    height: 100vh;
+  }
+  #map {
+    width: 100%;
+    height: 100%;
+    background: #eef2f6;
+  }
+
+  .map-header {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    z-index: 500;
+    background: rgba(255,255,255,.95);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--muted);
+    box-shadow: var(--shadow);
+  }
+  .map-header b { color: var(--text); font-weight: 700; }
+
+  /* Popups */
+  .leaflet-popup-content-wrapper {
+    background: #fff;
+    color: var(--text);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  .leaflet-popup-content {
+    margin: 12px 14px;
+    font-family: inherit;
+    line-height: 1.4;
+  }
+  .leaflet-popup-tip { background: #fff; }
+
+  .popup-code {
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .popup-name {
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 1.3;
+    margin-bottom: 10px;
+    max-width: 240px;
+  }
+  .popup-students {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .popup-students .num {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent-2);
+  }
+  .popup-students .lbl {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* Markers */
+  .school-marker {
+    width: 14px;
+    height: 14px;
+    background: var(--accent);
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(200,71,43,.4), 0 2px 4px rgba(0,0,0,.25);
+    transition: transform .15s;
+  }
+  .school-marker:hover { transform: scale(1.4); }
+  .school-marker.active {
+    background: var(--accent-2);
+    box-shadow: 0 0 0 3px rgba(31,111,235,.35), 0 2px 6px rgba(0,0,0,.3);
+    transform: scale(1.5);
+  }
+
+  @media (max-width: 860px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .sidebar { max-height: 50vh; }
+    .map-area { height: 50vh; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <h1>Centros Escolares</h1>
+      <p>El Salvador · Mapa interactivo</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat schools">
+        <div class="label">Escuelas</div>
+        <div class="value" id="total-schools">0</div>
+        <div class="sub">centros registrados</div>
+      </div>
+      <div class="stat students">
+        <div class="label">Estudiantes</div>
+        <div class="value" id="total-students">0</div>
+        <div class="sub">total inscritos</div>
+      </div>
+    </div>
+
+    <div class="search-box">
+      <label for="search">Buscar por código o nombre</label>
+      <input id="search" class="search-input" type="text" placeholder="Ej: 11330 o 'Apopa'..." autocomplete="off"/>
+    </div>
+
+    <div class="result-count"><span id="result-num">0</span> resultados</div>
+
+    <div class="list" id="list"></div>
+  </aside>
+
+  <div class="map-area">
+    <div class="map-header"><b>Vista geográfica</b> · click en marcador para detalles</div>
+    <div id="map"></div>
+  </div>
+</div>
+
+<script>
+  const schools = [
+    {code:"10057", name:"CENTRO ESCOLAR CIUDAD CREDISA", students:13, lat:13.693645, lng:-89.161384},
+    {code:"10084", name:"CENTRO ESCOLAR URBANIZACION MONTELIMAR", students:10, lat:13.598005, lng:-89.123145},
+    {code:"10096", name:"CENTRO ESCOLAR SAN ANTONIO", students:4, lat:13.740462, lng:-89.138871},
+    {code:"10123", name:"CENTRO ESCOLAR URB SANTA TERESA DE LAS FLORES", students:6, lat:13.812739, lng:-89.166699},
+    {code:"10160", name:"COMPLEJO EDUCATIVO RESIDENCIAL ALTAVISTA", students:29, lat:13.735009, lng:-89.080578},
+    {code:"10209", name:"CENTRO ESCOLAR JOSÉ RUBEN RIVERA RIVERA", students:11, lat:13.878994, lng:-89.473111},
+    {code:"11015", name:"CENTRO ESCOLAR PROFESOR OSCAR ARMANDO GUERRA CASTRO", students:7, lat:13.78384, lng:-89.399576},
+    {code:"11130", name:"CENTRO ESCOLAR ORGANIZACION DE ESTADOS IBEROAMERIC", students:10, lat:13.684445, lng:-89.301042},
+    {code:"11307", name:"INSTITUTO NACIONAL DE AGUILARES", students:3, lat:13.955686, lng:-89.193213},
+    {code:"11308", name:"CENTRO ESCOLAR MODESTO BARRIOS", students:27, lat:13.956697, lng:-89.185301},
+    {code:"11314", name:"CENTRO ESCOLAR CELSA PALACIOS", students:3, lat:13.945214, lng:-89.187689},
+    {code:"11317", name:"CENTRO ESCOLAR SAN SEBASTIAN", students:15, lat:13.798468, lng:-89.177416},
+    {code:"11319", name:"COMPLEJO EDUCATIVO PROFESOR IVAN ALEXANDER BURGOS", students:31, lat:13.800573, lng:-89.163139},
+    {code:"11321", name:"CENTRO ESCOLAR COLONIA LA ERMITA", students:12, lat:13.81117, lng:-89.178168},
+    {code:"11323", name:"CENTRO ESCOLAR PROFESOR ROMEO HUMBERTO GONZALEZ", students:8, lat:13.788256, lng:-89.178512},
+    {code:"11330", name:"INSTITUTO NACIONAL DE APOPA", students:81, lat:13.804144, lng:-89.181574},
+    {code:"11331", name:"CENTRO ESCOLAR CANTON EL ANGEL", students:8, lat:13.795033, lng:-89.187344},
+    {code:"11336", name:"CENTRO ESCOLAR COLONIA LAS CAÑAS", students:10, lat:13.813181, lng:-89.170438},
+    {code:"11337", name:"COMPLEJO EDUCATIVO SARA PALMA DE JULE", students:11, lat:13.817594, lng:-89.181067},
+    {code:"11338", name:"CENTRO ESCOLAR REPUBLICA DE CHINA", students:14, lat:13.811828, lng:-89.181355},
+    {code:"11340", name:"COMPLEJO EDUCATIVO INGENIERO JOSE NAPOLEON DUARTE", students:9, lat:13.814597, lng:-89.186678},
+    {code:"11342", name:"CENTRO ESCOLAR DE POPOTLAN", students:15, lat:13.80046, lng:-89.170009},
+    {code:"11343", name:"CENTRO ESCOLAR ASENTAMIENTO DE LA COLONIA POPOTLAN", students:22, lat:13.803091, lng:-89.167548},
+    {code:"11344", name:"CENTRO ESCOLAR VICENTE ACOSTA", students:46, lat:13.80363, lng:-89.18179},
+    {code:"11349", name:"COMPLEJO EDUCATIVO INGENIERO GUILLERMO BORJA NATHA", students:25, lat:13.80597, lng:-89.194629},
+    {code:"11353", name:"CENTRO ESCOLAR DOCTOR DOROTEO VASCONCELOS", students:36, lat:13.735026, lng:-89.200835},
+    {code:"11354", name:"CENTRO ESCOLAR DOCTOR ARTURO ROMERO", students:61, lat:13.734303, lng:-89.204204},
+    {code:"11365", name:"COMPLEJO EDUCATIVO LA PAZ", students:15, lat:13.732057, lng:-89.181286},
+    {code:"11367", name:"COMPLEJO EDUCATIVO ANGELA DE SOLER", students:14, lat:13.769183, lng:-89.18413},
+    {code:"11385", name:"CENTRO ESCOLAR CANTON SAN JERONIMO", students:15, lat:13.922065, lng:-89.184635},
+    {code:"11386", name:"CENTRO ESCOLAR SALVADOR SALAZAR ARRUE", students:5, lat:13.873527, lng:-89.168884},
+    {code:"11394", name:"CENTRO ESCOLAR JARDINES DE SELT-SUTT", students:10, lat:13.712139, lng:-89.086065},
+    {code:"11395", name:"INSTITUTO NACIONAL DE SAN BARTOLO", students:74, lat:13.705475, lng:-89.10436},
+    {code:"11400", name:"COMPLEJO EDUCATIVO CANTON SAN BARTOLO", students:41, lat:13.707955, lng:-89.099632},
+    {code:"11406", name:"COMPLEJO EDUCATIVOCOLONIA VERACRUZ, CANTON SAN BAR", students:25, lat:13.715571, lng:-89.092844},
+    {code:"11409", name:"CENTRO ESCOLAR REPUBLICA DE VENEZUELA", students:13, lat:13.689434, lng:-89.132155},
+    {code:"11411", name:"CENTRO ESCOLAR JOHN F. KENNEDY", students:33, lat:13.689543, lng:-89.128838},
+    {code:"11414", name:"CENTRO ESCOLAR REPUBLICA DE FRANCIA", students:4, lat:13.734279, lng:-89.192068},
+    {code:"11420", name:"INSTITUTO NACIONAL MAESTRO ALBERTO MASFERRER", students:3, lat:13.727501, lng:-89.20407},
+    {code:"11422", name:"COMPLEJO EDUCATIVO REPUBLICA ORIENTAL DEL URUGUAY", students:61, lat:13.72744, lng:-89.20462},
+    {code:"11426", name:"CENTRO ESCOLAR CANTON SAN ROQUE", students:16, lat:13.744354, lng:-89.218853},
+    {code:"11427", name:"COMPLEJO EDUCATIVO REINO DE SUECIA", students:18, lat:13.738877, lng:-89.208701},
+    {code:"11431", name:"COMPLEJO EDUCATIVO PROFESORA HERMINIA MARTINEZ ALV", students:14, lat:13.734364, lng:-89.224312},
+    {code:"11433", name:"COMPLEJO EDUCATIVO PROFESORA MARIA AMANDA ARTIGA D", students:31, lat:13.781476, lng:-89.177977},
+    {code:"11436", name:"COMPLEJO EDUCATIVO AMALIA VDA. DE MENENDEZ", students:39, lat:13.724829, lng:-89.188735},
+    {code:"11437", name:"CENTRO ESCOLAR 22 DE JUNIO", students:7, lat:13.72332, lng:-89.188154},
+    {code:"11438", name:"COMPLEJO EDUCATIVO JAPON", students:15, lat:13.727164, lng:-89.190171},
+    {code:"11439", name:"CENTRO ESCOLAR COLONIA SAN SIMON", students:33, lat:13.737535, lng:-89.185947},
+    {code:"11440", name:"CENTRO ESCOLAR CANTÓN MAPILAPA", students:6, lat:13.818488, lng:-89.257493},
+    {code:"11443", name:"CENTRO ESCOLAR CANTON ALDEA DE LAS MERCEDES", students:14, lat:13.803508, lng:-89.225865},
+    {code:"11451", name:"CENTRO ESCOLAR JOSE MATIAS DELGADO", students:39, lat:13.811194, lng:-89.229625},
+    {code:"11453", name:"COMPLEJO EDUCATIVO PROFESOR ALBERTO MONTIEL V.", students:13, lat:13.831917, lng:-89.225804},
+    {code:"11457", name:"CENTRO ESCOLAR CANTON SANTA LUCIA LOS PALONES", students:13, lat:13.634386, lng:-89.168039},
+    {code:"11471", name:"COMPLEJO EDUCATIVO MANUEL JOSE ARCE", students:44, lat:13.576754, lng:-89.204239},
+    {code:"11474", name:"CENTRO ESCOLAR CANTON LAS BARROSAS", students:6, lat:13.543607, lng:-89.195798},
+    {code:"11482", name:"COMPLEJO EDUCATIVO COLONIA EL MILAGRO", students:10, lat:13.663358, lng:-89.182185},
+    {code:"11483", name:"CENTRO ESCOLAR DOCTOR EUSEBIO CORDON CEA", students:28, lat:13.65522, lng:-89.173343},
+    {code:"11486", name:"COMPLEJO EDUCATIVO COLONIA SAN ANTONIO", students:25, lat:13.654829, lng:-89.186351},
+    {code:"11488", name:"CENTRO ESCOLAR PROFESOR JUSTO GONZALEZ", students:16, lat:13.656594, lng:-89.184962},
+    {code:"11489", name:"COMPLEJO EDUCATIVO COMUNIDAD 10 DE OCTUBRE", students:13, lat:13.65207, lng:-89.165455},
+    {code:"11493", name:"CENTRO ESCOLAR DOMINGO FAUSTINO SARMIENTO", students:34, lat:13.667384, lng:-89.189545},
+    {code:"11495", name:"COMPLEJO EDUCATIVO GOLDTREE LIEBES", students:43, lat:13.64164, lng:-89.189115},
+    {code:"11499", name:"COMPLEJO EDUCATIVO COLONIA TIERRA VIRGEN", students:8, lat:13.716209, lng:-89.084048},
+    {code:"11500", name:"CENTRO ESCOLAR OLOF PALME", students:18, lat:13.737816, lng:-89.054851},
+    {code:"11501", name:"CENTRO ESCOLAR URBANIZACION SANTA TERESA", students:6, lat:13.748288, lng:-89.058845},
+    {code:"11507", name:"COMPLEJO EDUCATIVO JORGE LARDE", students:81, lat:13.734779, lng:-89.059149},
+    {code:"11508", name:"CENTRO ESCOLAR COLONIA LA PALMA, CANTON LA PALMA", students:4, lat:13.715319, lng:-89.071978},
+    {code:"11512", name:"CENTRO ESCOLAR CANTON LA PALMA", students:45, lat:13.721173, lng:-89.068626},
+    {code:"11516", name:"CENTRO ESCOLAR CANTON LA FLOR", students:4, lat:13.734985, lng:-89.043294},
+    {code:"11518", name:"COMPLEJO EDUCATIVO COLONIA ROSA LINDA", students:19, lat:13.742279, lng:-89.057355},
+    {code:"11522", name:"INSTITUTO NACIONAL ALBERT CAMUS", students:21, lat:13.714816, lng:-89.206404},
+    {code:"11531", name:"CENTRO ESCOLAR COLONIA LLANO VERDE", students:16, lat:13.698603, lng:-89.105629},
+    {code:"11532", name:"CENTRO ESCOLAR GENERAL FRANCISCO MORAZAN", students:77, lat:13.715622, lng:-89.205302},
+    {code:"11574", name:"CENTRO ESCOLAR REPUBLICA DE CANADA", students:25, lat:13.690446, lng:-89.235955},
+    {code:"11580", name:"CENTRO ESCOLAR AMATEPEC", students:16, lat:13.696247, lng:-89.169245},
+    {code:"11592", name:"CENTRO ESCOLAR JOSE MEJIA", students:15, lat:13.668459, lng:-89.223889},
+    {code:"11593", name:"CENTRO ESCOLAR SAN ANTONIO ABAD", students:29, lat:13.712904, lng:-89.22405},
+    {code:"11594", name:"CENTRO ESCOLAR JUANA LOPEZ", students:16, lat:13.717258, lng:-89.228851},
+    {code:"11597", name:"CENTRO ESCOLAR JUAN RAMON JIMENEZ", students:11, lat:13.685157, lng:-89.22544},
+    {code:"11598", name:"CENTRO ESCOLAR REPUBLICA DE ITALIA", students:15, lat:13.710011, lng:-89.259782},
+    {code:"11626", name:"CENTRO ESCOLAR SALVADOR MUGDAN", students:15, lat:13.709315, lng:-89.185942},
+    {code:"11627", name:"CENTRO ESCOLAR SANTIAGO I BARBERENA", students:7, lat:13.692441, lng:-89.208952},
+    {code:"11631", name:"CENTRO ESCOLAR LYNDON B. JOHNSON", students:12, lat:13.675768, lng:-89.189583},
+    {code:"11640", name:"COMPLEJO EDUCATIVO CAPITAN GENERAL GERARDO BARRIOS", students:14, lat:13.699431, lng:-89.212294},
+    {code:"11641", name:"CENTRO ESCOLAR CONSTITUCION 1950", students:4, lat:13.707817, lng:-89.180848},
+    {code:"11645", name:"CENTRO ESCOLAR MIGUEL PINTO", students:23, lat:13.722699, lng:-89.211591},
+    {code:"11648", name:"CENTRO ESCOLAR REPUBLICA DE HONDURAS", students:13, lat:13.68905, lng:-89.209165},
+    {code:"11650", name:"CENTRO ESCOLAR MONSEÑOR BASILIO PLANTIER", students:9, lat:13.694297, lng:-89.182082},
+    {code:"11651", name:"CENTRO ESCOLAR JORGE LARDE", students:49, lat:13.687328, lng:-89.189959},
+    {code:"11661", name:"COMPLEJO EDUCATIVO REPUBLICA DEL BRASIL", students:25, lat:13.686332, lng:-89.195397},
+    {code:"11665", name:"CENTRO ESCOLAR JOSE SIMEON CAÑAS", students:12, lat:13.681081, lng:-89.191367},
+    {code:"11667", name:"COMPLEJO EDUCATIVO JOAQUIN RODEZNO", students:8, lat:13.701335, lng:-89.195274},
+    {code:"11668", name:"CENTRO ESCOLAR JOSE MATIAS DELGADO", students:4, lat:13.692774, lng:-89.193215},
+    {code:"11669", name:"CENTRO ESCOLAR GENERAL RAMON BELLOSO", students:18, lat:13.683019, lng:-89.214622},
+    {code:"11674", name:"COMPLEJO EDUCATIVO DR. HUMBERTO ROMERO ALVERGUE", students:33, lat:13.685837, lng:-89.193333},
+    {code:"11675", name:"CENTRO ESCOLAR LIGA PANAMERICANA", students:7, lat:13.681828, lng:-89.183645},
+    {code:"11677", name:"COMPLEJO EDUCATIVO REPUBLICA DEL ECUADOR", students:13, lat:13.689142, lng:-89.201627},
+    {code:"11679", name:"COMPLEJO EDUCATIVO REPUBLICA DE COSTA RICA", students:8, lat:13.695629, lng:-89.188563},
+    {code:"11680", name:"CENTRO ESCOLAR REPUBLICA DE CHILE", students:13, lat:13.702168, lng:-89.182356},
+    {code:"11695", name:"CENTRO ESCOLAR GENERAL MANUEL BELGRANO", students:38, lat:13.642588, lng:-89.133748},
+    {code:"11708", name:"INSTITUTO NACIONAL SAN LUIS", students:48, lat:13.714151, lng:-89.131377},
+    {code:"11711", name:"CENTRO ESCOLAR BOSQUES DEL RIO", students:17, lat:13.720576, lng:-89.120894},
+    {code:"11712", name:"COMPLEJO EDUCATIVO COLONIA VILLA ALEGRE", students:16, lat:13.735578, lng:-89.139782},
+    {code:"11715", name:"CENTRO ESCOLAR REPARTO LOS SANTOS", students:24, lat:13.712501, lng:-89.135524},
+    {code:"11716", name:"CENTRO ESCOLAR RAFAELA SOTOMAYOR DE ALARCIA", students:3, lat:13.709548, lng:-89.144641},
+    {code:"11723", name:"COMPLEJO EDUCATIVO REPUBLICA DE COREA", students:30, lat:13.712283, lng:-89.148464},
+    {code:"11724", name:"CENTRO ESCOLAR COLONIA GUAYACAN", students:15, lat:13.713742, lng:-89.124601},
+    {code:"11731", name:"CENTRO ESCOLAR COLONIA SAN RAFAEL", students:12, lat:13.682353, lng:-89.140356},
+    {code:"11732", name:"CENTRO ESCOLAR ANTONIO JOSE CAÑAS", students:27, lat:13.704505, lng:-89.154855},
+    {code:"11735", name:"CENTRO ESCOLAR BARRIO EL PROGRESO", students:13, lat:13.706958, lng:-89.155239},
+    {code:"11736", name:"CENTRO ESCOLAR PROFESOR DANIEL CORDON SALGUERO", students:42, lat:13.704996, lng:-89.145206},
+    {code:"11740", name:"CENTRO ESCOLAR PROFESORA MARIA INOCENCIA DE PAREDE", students:12, lat:13.816149, lng:-89.1436},
+    {code:"11745", name:"CENTRO ESCOLAR CANTON VERACRUZ", students:9, lat:13.736081, lng:-89.093867},
+    {code:"11751", name:"COMPLEJO EDUCATIVO FE Y ALEGRIA", students:8, lat:13.818892, lng:-89.139358},
+    {code:"11752", name:"CENTRO ESCOLAR PRESBITERO NICOLAS AGUILAR", students:37, lat:13.779604, lng:-89.119678},
+    {code:"11759", name:"CENTRO ESCOLAR COMUNIDAD PRADERA III", students:19, lat:13.793202, lng:-89.162214},
+    {code:"11764", name:"CENTRO ESCOLAR CANTON CALLE REAL", students:22, lat:13.758179, lng:-89.166753},
+    {code:"11765", name:"CENTRO ESCOLAR CANTON ARENAL", students:6, lat:13.759382, lng:-89.178614},
+    {code:"11767", name:"CENTRO ESCOLAR CANTON SAN JOSE CORTEZ", students:15, lat:13.754729, lng:-89.145528},
+    {code:"11769", name:"CENTRO ESCOLAR CASERIO SAN ANTONIO LAS VEGAS", students:18, lat:13.770507, lng:-89.166783},
+    {code:"11770", name:"CENTRO ESCOLAR EDELMIRA MOLINA", students:10, lat:13.718074, lng:-89.169893},
+    {code:"11771", name:"CENTRO ESCOLAR REINO DE HOLANDA", students:20, lat:13.712889, lng:-89.173026},
+    {code:"11777", name:"CENTRO ESCOLAR CANTON MILINGO", students:37, lat:13.744367, lng:-89.168781},
+    {code:"11922", name:"COMPLEJO EDUCATIVO CANTON EL PEDREGAL", students:15, lat:13.443175, lng:-89.016759},
+    {code:"11932", name:"COMPLEJO EDUCATIVO MERCEDES LA CEIBA", students:3, lat:13.647466, lng:-88.912794},
+    {code:"11933", name:"COMPLEJO EDUCATIVO CASERIO VALLE NUEVO", students:27, lat:13.477823, lng:-89.156951},
+    {code:"11935", name:"INSTITUTO NACIONAL DE OLOCUILTA", students:8, lat:13.576319, lng:-89.11629},
+    {code:"11937", name:"CENTRO ESCOLAR PROFESORA MARIA EVANGELINA ALVAREZ", students:14, lat:13.613288, lng:-89.122247},
+    {code:"11941", name:"CENTRO ESCOLAR PROFESORA ROSA MIRIAN ABREGO DE HER", students:2, lat:13.50565, lng:-89.140985},
+    {code:"11943", name:"COMPLEJO EDUCATIVO ALBERTO MASFERRER", students:36, lat:13.572435, lng:-89.116454},
+    {code:"11944", name:"CENTRO ESCOLAR CANTON SAN SEBASTIAN", students:13, lat:13.540353, lng:-89.129142},
+    {code:"11946", name:"CENTRO ESCOLAR MARIA ESTER ALFARO", students:9, lat:13.571358, lng:-89.038357},
+    {code:"11952", name:"CENTRO ESCOLAR CANTON CONCEPCION LOURDES", students:6, lat:13.637325, lng:-88.988368},
+    {code:"11954", name:"INSTITUTO NACIONAL DE SAN EMIGDIO", students:4, lat:13.649283, lng:-88.976656},
+    {code:"11955", name:"CENTRO ESCOLAR AMALIA ROSALES CAMPOS", students:6, lat:13.575272, lng:-89.096944},
+    {code:"11959", name:"COMPLEJO EDUCATIVO CLAUDIA LARS", students:18, lat:13.608822, lng:-89.095446},
+    {code:"11962", name:"CENTRO ESCOLAR CANTON EL GOLFO", students:9, lat:13.439704, lng:-88.91586},
+    {code:"11964", name:"CENTRO ESCOLAR CANTON LA LAGUNETA", students:5, lat:13.593117, lng:-88.874572},
+    {code:"11975", name:"CENTRO ESCOLAR PROFESORA JUANA SARA LOPEZ DE MIRAN", students:10, lat:13.504561, lng:-89.088374},
+    {code:"11988", name:"INSTITUTO NACIONAL DE SAN LUIS TALPA", students:40, lat:13.476213, lng:-89.087755},
+    {code:"11991", name:"CENTRO ESCOLAR CASERIO EL SALAMAR", students:15, lat:13.470884, lng:-89.056729},
+    {code:"11992", name:"CENTRO ESCOLAR CANTON NUEVO EDEN", students:5, lat:13.474328, lng:-89.077931},
+    {code:"12000", name:"CENTRO ESCOLAR CANTON SAN BARTOLO", students:3, lat:13.628033, lng:-88.991292},
+    {code:"12001", name:"CENTRO ESCOLAR LA PAZ", students:21, lat:13.618606, lng:-89.022754},
+    {code:"12012", name:"COMPLEJO EDUCATIVO CANTON LAS ISLETAS", students:28, lat:13.407543, lng:-89.010495},
+    {code:"12015", name:"CENTRO ESCOLAR MARIA TERESA DUKE", students:12, lat:13.489343, lng:-89.047074},
+    {code:"12017", name:"CENTRO ESCOLAR NEMESIA LUNA", students:14, lat:13.547575, lng:-89.036174},
+    {code:"12032", name:"CENTRO ESCOLAR PROFESOR JOSÉ RICARDO CATIVO", students:5, lat:13.513503, lng:-88.914753},
+    {code:"12049", name:"INSTITUTO NACIONAL JOSE INGENIEROS", students:39, lat:13.50768, lng:-88.938282},
+    {code:"12051", name:"CENTRO ESCOLAR CENTRO AMERICA", students:12, lat:13.53015, lng:-88.970256},
+    {code:"12053", name:"CENTRO ESCOLAR ANASTACIO AQUINO", students:8, lat:13.534682, lng:-88.922209},
+    {code:"12059", name:"CENTRO ESCOLAR CASERIO LA FLECHA", students:11, lat:13.492093, lng:-88.99915},
+    {code:"12061", name:"CENTRO ESCOLAR 14 DE ABRIL", students:4, lat:13.513907, lng:-88.969181},
+    {code:"12124", name:"CENTRO ESCOLAR CATARINO DE JESUS ORTIZ", students:6, lat:13.510879, lng:-88.87052},
+    {code:"13663", name:"COMPLEJO EDUCATIVO REPUBLICA DOMINICANA", students:20, lat:13.716795, lng:-89.190562},
+    {code:"13668", name:"CENTRO ESCOLAR AGUSTIN LINARES", students:34, lat:13.715527, lng:-89.130282},
+    {code:"13671", name:"CENTRO ESCOLAR LA PONDEROSA", students:17, lat:13.817345, lng:-89.180361},
+    {code:"13713", name:"CENTRO ESCOLAR URBANIZACION LAS MARGARITAS", students:37, lat:13.723311, lng:-89.143354},
+    {code:"14806", name:"CENTRO ESCOLAR ALTAVISTA", students:50, lat:13.720307, lng:-89.098011},
+    {code:"14808", name:"INSTITUTO NACIONAL DE LA COLONIA SANTA LUCIA", students:31, lat:13.688507, lng:-89.130658},
+    {code:"14812", name:"COMPLEJO EDUCATIVO CIUDAD FUTURA", students:26, lat:13.787207, lng:-89.186424},
+    {code:"60247", name:"CENTRO ESCOLAR URBANIZACION CUMBRES DE SAN BARTOLO", students:16, lat:13.730671, lng:-89.111479},
+    {code:"60250", name:"CENTRO ESCOLAR CASERIO RESIDENCIAL ALTAVISTA CANTON VERACRUZ", students:14, lat:13.734653, lng:-89.088485},
+    {code:"60321", name:"CENTRO ESCOLAR CASERIO EL GUAYABO CANTON SAN ISIDRO LOS PLANES", students:4, lat:13.728793, lng:-89.269276},
+    {code:"68097", name:"CENTRO ESCOLAR CANTON SEGURA", students:3, lat:13.940169, lng:-89.23211},
+    {code:"70001", name:"COMPLEJO EDUCATIVO CANTON LOS MANGOS", students:8, lat:13.963686, lng:-89.196535},
+    {code:"70041", name:"CENTRO ESCOLAR CANTON AMAYON", students:5, lat:13.517006, lng:-89.170156},
+    {code:"70042", name:"COMPLEJO EDUCATIVO CASERIO PLAN DEL MANGO, CANTON", students:7, lat:13.506397, lng:-89.196005},
+    {code:"70046", name:"CENTRO ESCOLAR CANTON AZACUALPA", students:15, lat:13.540411, lng:-89.175897},
+    {code:"70063", name:"CENTRO ESCOLAR CASERIO COMUNIDAD SAN ANDRES, CANTO", students:19, lat:13.721621, lng:-89.074797},
+    {code:"70064", name:"COMPLEJO EDUCATIVO CASERIO COMUNIDAD VALLE LAS DEL", students:11, lat:13.724162, lng:-89.085577},
+    {code:"70070", name:"COMPLEJO EDUCATIVO CANTON JOYA GRANDE", students:13, lat:13.666521, lng:-89.091466},
+    {code:"70080", name:"CENTRO ESCOLAR CANTON EL GUAJE", students:1, lat:13.637455, lng:-89.147087},
+    {code:"70093", name:"CENTRO ESCOLAR CASERIO URBANIZACION LIRIOS DEL NOR", students:22, lat:13.768344, lng:-89.17568},
+    {code:"86237", name:"CENTRO ESCOLAR CANTON LA UNION", students:7, lat:13.741244, lng:-89.102124},
+    {code:"86332", name:"COMPLEJO EDUCATIVO URBANIZACION MONTECARMELO, CANT", students:5, lat:13.770677, lng:-89.181603},
+    {code:"88036", name:"COMPLEJO EDUCATIVO CATOLICO SANTA CATALINA", students:26, lat:13.801408, lng:-89.17843337},
+    {code:"90053", name:"ESCUELA MUNICIPAL DE CIUDAD FUTURA FASE I", students:18, lat:13.784216, lng:-89.184816}
+  ];
+
+  const totalSchools = schools.length;
+  const totalStudents = schools.reduce((s, c) => s + c.students, 0);
+
+  document.getElementById('total-schools').textContent = totalSchools.toLocaleString('es-SV');
+  document.getElementById('total-students').textContent = totalStudents.toLocaleString('es-SV');
+
+  // Map
+  const map = L.map('map', { zoomControl: true }).setView([13.72, -89.15], 11);
+
+  // OpenStreetMap standard tiles - Open license (ODbL), only requires attribution
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19
+  }).addTo(map);
+
+  const markers = {};
+  schools.forEach(s => {
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="school-marker" data-code="${s.code}"></div>`,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7]
+    });
+    const m = L.marker([s.lat, s.lng], { icon }).addTo(map);
+    m.bindPopup(`
+      <div class="popup-code">CÓDIGO ${s.code}</div>
+      <div class="popup-name">${s.name}</div>
+      <div class="popup-students">
+        <span class="num">${s.students}</span>
+        <span class="lbl">${s.students === 1 ? 'estudiante' : 'estudiantes'}</span>
+      </div>
+    `);
+    m.on('click', () => setActive(s.code));
+    markers[s.code] = m;
+  });
+
+  const bounds = L.latLngBounds(schools.map(s => [s.lat, s.lng]));
+  map.fitBounds(bounds, { padding: [40, 40] });
+
+  // Search + list
+  const listEl = document.getElementById('list');
+  const searchEl = document.getElementById('search');
+  const resultNumEl = document.getElementById('result-num');
+  let activeCode = null;
+
+  function renderList(filter = '') {
+    const q = filter.trim().toLowerCase();
+    const filtered = !q ? schools : schools.filter(s =>
+      s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)
+    );
+
+    resultNumEl.textContent = filtered.length;
+    listEl.innerHTML = '';
+
+    if (filtered.length === 0) {
+      const div = document.createElement('div');
+      div.className = 'item no-results';
+      div.textContent = 'Sin coincidencias';
+      listEl.appendChild(div);
+      return;
+    }
+
+    filtered.forEach(s => {
+      const div = document.createElement('div');
+      div.className = 'item' + (s.code === activeCode ? ' active' : '');
+      div.dataset.code = s.code;
+      div.innerHTML = `
+        <div class="code">${s.code}</div>
+        <div class="name">${s.name}</div>
+        <div class="meta"><span class="badge">${s.students}</span> ${s.students === 1 ? 'estudiante' : 'estudiantes'}</div>
+      `;
+      div.addEventListener('click', () => {
+        setActive(s.code);
+        map.flyTo([s.lat, s.lng], 16, { duration: 0.8 });
+        markers[s.code].openPopup();
+      });
+      listEl.appendChild(div);
+    });
+  }
+
+  function setActive(code) {
+    activeCode = code;
+    document.querySelectorAll('.item').forEach(el => {
+      el.classList.toggle('active', el.dataset.code === code);
+      if (el.dataset.code === code) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+    document.querySelectorAll('.school-marker').forEach(el => {
+      el.classList.toggle('active', el.dataset.code === code);
+    });
+  }
+
+  searchEl.addEventListener('input', e => renderList(e.target.value));
+  renderList();
+</script>
+</body>
+</html>
