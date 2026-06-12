@@ -394,7 +394,9 @@ function pintarResumen(){
   const asistentes = escuelas.reduce((s,e)=>s+e.asistencia,0);
   const conAsis = escuelas.filter(e=>e.asistencia>0).length;
   const sinAsis = nEsc - conAsis;
-  const pct = inscritos>0 ? (asistentes/inscritos*100) : 0;
+  // % de asistencia: solo sobre la matrícula de las escuelas que ya reportaron (asistencia > 0)
+  const inscritosReportados = escuelas.filter(e=>e.asistencia>0).reduce((s,e)=>s+e.total,0);
+  const pct = inscritosReportados>0 ? (asistentes/inscritosReportados*100) : 0;
 
   ponerValor("numEscuelas", nEsc.toLocaleString("es-SV"));
   ponerValor("numInscritos", inscritos.toLocaleString("es-SV"));
